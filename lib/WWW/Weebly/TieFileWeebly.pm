@@ -32,6 +32,15 @@ sub PRINTF {
 	printf ${$self}, $fmt, @args;
 }
 
+sub WRITE {
+
+	my $self   = shift;
+	my $string = shift;
+	my $length = shift || length $string;
+	my $offset = shift || 0;
+	return syswrite $self, $string, $length, $offset;
+}
+
 sub CLOSE {
 	close shift;
 }

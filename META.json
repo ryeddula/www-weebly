@@ -1,0 +1,51 @@
+{
+   "abstract" : "Perl interface to interact with the Weebly API.",
+   "author" : [
+      "Rishwanth Yeddula <ryeddula@cpan.org>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.4003, CPAN::Meta::Converter version 2.112150",
+   "license" : [
+      "artistic_2"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "WWW-Weebly",
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "Test::More" : 0
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "Module::Build" : 0
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "HTTP::Tiny" : 0,
+            "URI::Escape" : 0
+         }
+      }
+   },
+   "provides" : {
+      "WWW::Weebly" : {
+         "file" : "lib/WWW/Weebly.pm",
+         "version" : "0.01"
+      },
+      "WWW::Weebly::TieFileWeebly" : {
+         "file" : "lib/WWW/Weebly/TieFileWeebly.pm",
+         "version" : 0
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://opensource.org/licenses/artistic-license-2.0.php"
+      ]
+   },
+   "version" : "0.01"
+}

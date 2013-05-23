@@ -12,6 +12,6 @@ my $url    = $ENV{'WEEBLY_URL'}    || 'http://testing-weebly.not.real.com';
 
 ok ( defined ($api) && ref $api eq 'WWW::Weebly', "API object creation" );
 ok ( $api->get_weebly_secret() eq $secret,  "Weebly Secret");
-ok ( $api->get_base_apiurl() eq $url, "Weebly Query URL");
+ok ( $api->get_weebly_url() eq $url, "Weebly Query URL");
 
 done_testing();

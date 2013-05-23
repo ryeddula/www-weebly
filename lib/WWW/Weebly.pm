@@ -8,6 +8,7 @@ use Carp qw(croak);
 use Data::Dumper;
 use Digest::MD5 qw(md5_hex);
 use English qw(-no_match_vars);
+use IO::Interactive qw(interactive);
 use List::Util qw(first);
 
 use HTTP::Tiny;
@@ -25,6 +26,15 @@ Version 0.01
 =cut
 
 our $VERSION = '0.01';
+
+# Taken from IO::Interactive - creates a null file handle
+local (*DEV_NULL, *DEV_NULL2);
+my $dev_null;
+BEGIN {
+	pipe *DEV_NULL, *DEV_NULL2
+		or die "Internal error: can't create null filehandle";
+	$dev_null = \*DEV_NULL;
+}
 
 =head1 SYNOPSIS
 
@@ -81,15 +91,17 @@ sub new {
 	my $self = {};
 	bless $self, $class;
 
-	if ( _boolean ( delete $opts->{ debug } ) ) {
-		$self->{ debug } = *STDERR;
-		if ( my $debug_file = delete $opts->{debug_file} ) {
+	if ( _boolean ( $opts->{ debug } ) ) {
+		$self->{ debug } = $dev_null;
+		if ( my $debug_file = $opts->{debug_file} ) {
 			tie *{$self->{ debug }}, 'WWW::Weebly::TieFileWeebly', $debug_file
 				or croak ( 'unable to open the debug_file specified.' );
+		} else {
+			$self->{ debug } = interactive(*STDERR);
 		}
 	}
 
-	$self->{ weebly_secret } = delete $opts->{ weebly_secret }
+	$self->{ weebly_secret } = $opts->{ weebly_secret }
 		or croak ( 'weebly_secret is a required parameter' );
 
 	# Configure the proper tid_sub for transaction_id generation
@@ -97,28 +109,30 @@ sub new {
 		$self->{ tid_sub } = $opts->{ tid_sub };
 	} elsif ( defined $opts->{ tid_seed } and not ref $opts->{ tid_seed } ) {
 		$self->{ tid_sub } = sub {
-			return md5_hex $opts->{ tid_seed }, time;
-			}
+				require Time::HiRes;
+				Time::HiRes->import(qw|gettimeofday|);
+				return md5_hex $opts->{ tid_seed }, gettimeofday();
+			};
 	} else {
 		croak ( 'Must specifiy either a coderef for tid_sub, or a value for tid_seed' );
 	}
 
-	# Configure query_url
+	# Configure weebly_url
 	if ( defined $opts->{ weebly_url } ) {
-		$self->{ query_url } = $opts->{ weebly_url };
+		$self->{ weebly_url } = $opts->{ weebly_url };
 	} else {
 		croak ( 'Must specify which URL to query in weebly_url' );
 	}
 
 	# Initiate the LWP objects for the queries
-	my $http_opts = delete $opts->{ http_opts };
+	my $http_opts = $opts->{ http_opts };
 	if (not (exists $http_opts->{agent} and defined $http_opts->{agent}) ) {
 		$http_opts->{agent} = 'WWW-Weebly'.$VERSION;
 	}
 	$self->{ _ua }  = HTTP::Tiny->new ( %{ $http_opts } );
 
 	if ( $self->{ debug } ) {
-		print { $self->{ debug } } '[d] Query URL: ' . $self->{ query_url } . "\n";
+		print { $self->{ debug } } '[d] Query URL: ' . $self->{ weebly_url } . "\n";
 		print { $self->{ debug } } '[d] Weebly Secret: ' . $self->{ weebly_secret } . "\n";
 		{
 			local $Data::Dumper::Deparse = 1;
@@ -131,7 +145,7 @@ sub new {
 
 =head2 new_user()
 
-Dispatches a newuser call to the URL specified in $self->{query_url}.
+Dispatches a newuser call to the URL specified in $self->{weebly_url}.
 
 B<Input>: None.
 
@@ -146,12 +160,12 @@ B<Returns> a hashref with the following keys otherwise:
 =cut
 
 sub new_user {
-	return shift->_make_request_handler ( 'newuser' );
+	return shift->_do_request ( 'newuser' );
 }
 
 =head2 login()
 
-Dispatches a login call to the URL specified in $self->{query_url}.
+Dispatches a login call to the URL specified in $self->{weebly_url}.
 
 Passes critical user account information to Weebly, such as the FTP info, account type (Basic/Premium), widget type, etc.
 
@@ -183,17 +197,17 @@ B<Returns> a hashref with the following keys otherwise:
 sub login {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'login', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	my $output = $self->_make_request_handler ( 'login', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	my $output = $self->_do_request ( 'login', $params );
 	if ( $output->{ success } ) {
-		$output->{ login_url } = $self->get_base_apiurl () . '/weebly/login.php?t=' . delete $output->{ token };
+		$output->{ login_url } = $self->get_weebly_url () . '/weebly/login.php?t=' . delete $output->{ token };
 	}
 	return $output;
 }
 
 =head2 enable_account()
 
-Dispatches a enableaccount call to the URL specified in $self->{query_url}.
+Dispatches a enableaccount call to the URL specified in $self->{weebly_url}.
 
 This call enables a user account that has been previously disabled.
 
@@ -213,13 +227,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub enable_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'enableaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'enableaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'enableaccount', $params );
 }
 
 =head2 disable_account()
 
-Dispatches a disableaccount call to the URL specified in $self->{query_url}.
+Dispatches a disableaccount call to the URL specified in $self->{weebly_url}.
 
 This call disables login to a user account. This account will be accounted for in user quota numbers.
 
@@ -241,13 +255,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub disable_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'disableaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'disableaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'disableaccount', $params );
 }
 
 =head2 delete_account()
 
-Dispatches a deleteaccount call to the URL specified in $self->{query_url}.
+Dispatches a deleteaccount call to the URL specified in $self->{weebly_url}.
 
 This call deletes a user account. This account will not be accounted for in user quota numbers.
 
@@ -269,13 +283,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub delete_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'deleteaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'deleteaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'deleteaccount', $params );
 }
 
 =head2 undelete_account()
 
-Dispatches a undeleteaccount call to the URL specified in $self->{query_url}.
+Dispatches a undeleteaccount call to the URL specified in $self->{weebly_url}.
 
 This call restores a deleted user account.
 
@@ -295,13 +309,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub undelete_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'undeleteaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'undeleteaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'undeleteaccount', $params );
 }
 
 =head2 upgrade_account()
 
-Dispatches a upgradeaccount call to the URL specified in $self->{query_url}.
+Dispatches a upgradeaccount call to the URL specified in $self->{weebly_url}.
 
 This call upgrades a user account with a given service.
 
@@ -324,13 +338,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub upgrade_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'upgradeaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'upgradeaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'upgradeaccount', $params );
 }
 
 =head2 downgrade_account()
 
-Dispatches a downgradeaccount call to the URL specified in $self->{query_url}.
+Dispatches a downgradeaccount call to the URL specified in $self->{weebly_url}.
 
 This call can be used to check if the specified user_id has Pro or Ecommerce features enabled.
 
@@ -350,13 +364,13 @@ B<Returns> a hashref with the following keys otherwise:
 sub downgrade_account {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'downgradeaccount', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'downgradeaccount', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'downgradeaccount', $params );
 }
 
 =head2 has_service()
 
-Dispatches a hasservice call to the URL specified in $self->{query_url}.
+Dispatches a hasservice call to the URL specified in $self->{weebly_url}.
 
 This call can be used to check if the specified user_id has Pro or Ecommerce features enabled.
 
@@ -375,22 +389,9 @@ B<Returns> a hashref with the following keys otherwise:
 sub has_service {
 	my ( $self, $params ) = @_;
 	$self->_sanitize_params ( 'hasservice', $params )
-		or $self->_error ( qq{Failed to sanitize params. Error: "$self->get_error".}, 1 );
-	return $self->_make_request_handler ( 'hasservice', $params );
+		or $self->_error ( qq{Failed to sanitize params. Error: }.$self->get_error, 1 );
+	return $self->_do_request ( 'hasservice', $params );
 }
-
-=head2 get_tid()
-
-B<Input>: None.
-
-B<Returns> the tid value generated by the sub referenced in $self->{tid_sub}.
-
-If a 'tid_seed' value was specified when the object was created, then the value returned is the
-md5_hex hash of the tid_seed value concatenated with the time().
-
-=cut
-
-sub get_tid { return shift->{ tid_sub }->(); }
 
 =head2 get_auth_token()
 
@@ -414,13 +415,13 @@ sub get_auth_token {
 	return md5_hex ( $self->get_weebly_secret (), @params );
 }
 
-=head2 get_base_apiurl()
+=head2 get_weebly_url()
 
-B<Returns> the base url that will be queried, which is stored in $self->{query_url}.
+B<Returns> the base url that will be queried, which is stored in $self->{weebly_url}.
 
 =cut
 
-sub get_base_apiurl { return shift->{ 'query_url' }; }
+sub get_weebly_url { return shift->{ 'weebly_url' }; }
 
 =head2 get_weebly_secret()
 
@@ -444,7 +445,7 @@ The following are not meant to be used directly, but are available if 'finer' co
 
 =cut
 
-=head2 _make_request_handler()
+=head2 _do_request()
 
 Wraps the call to _make_request and handles error checks.
 
@@ -454,7 +455,7 @@ B<Output> Returns undef on failure (sets $self->{error} with the proper error). 
 
 =cut
 
-sub _make_request_handler {
+sub _do_request {
 
 	my $self   = shift;
 	my $action = shift;
@@ -512,7 +513,7 @@ sub _parse_output {
 Depending on the action passed, it will return part of the URL that you can use along with the _stringify_params method to generate the full GET url.
 
 B<Input>: action param
-B<Returns>: get_base_apiurl().'/weebly/api.php?action='.$action
+B<Returns>: get_weebly_url().'/weebly/api.php?action='.$action
 
 =cut
 
@@ -521,7 +522,7 @@ sub _get_url {
 	my $self   = shift;
 	my $action = shift;
 
-	return $self->get_base_apiurl () . '/weebly/api.php?action=' . $action;
+	return $self->get_weebly_url () . '/weebly/api.php?action=' . $action;
 }
 
 =head2 _add_auth()
@@ -533,11 +534,24 @@ Adds the neccessary transaction id (tid) and authentication tokens to the URI
 sub _add_auth {
 
 	my ( $self, $uri, $action, $userid ) = @_;
-	my $tid = $self->get_tid ();
+	my $tid = $self->_get_tid ();
 	my $auth = $self->get_auth_token ( $tid, $action, $userid );
 	$uri .= '&tid=' . $tid . '&auth=' . $auth;
 	return $uri;
 }
+
+=head2 _get_tid()
+
+B<Input>: None.
+
+B<Returns> the tid value generated by the sub referenced in $self->{tid_sub}.
+
+If a 'tid_seed' value was specified when the object was created, then the value returned is the
+md5_hex hash of the tid_seed value concatenated with the time().
+
+=cut
+
+sub _get_tid { return shift->{ tid_sub }->(); }
 
 =head2 _make_request()
 
@@ -621,6 +635,11 @@ sub _sanitize_params {
 
 	_uri_escape_values ( $params );
 	_remove_unwanted_keys ( $params, $required_keys->{ lc $action } );
+
+	# remove publish_upsell from the wanted list for 'login' calls - since its an optional param.
+	delete $required_keys->{ login }->{ publish_upsell };
+
+	# check the params passed with the wanted list
 	if ( my $check = _check_required_keys ( $params, $required_keys->{ lc $action } ) ) {
 		my $error;
 		$error .= 'Missing required parameter(s): ' . join ( ', ', @{ $check->{ 'missing_params' } } ) . '; '
@@ -687,9 +706,6 @@ sub _check_required_keys {
 
 	foreach my $wanted_key ( keys %{ $wanted_ref } ) {
 		if ( not ( exists $params_ref->{ $wanted_key } and defined $params_ref->{ $wanted_key } ) ) {
-
-			# ignore publish_upsell cause it is really optional
-			next if $wanted_key eq 'publish_upsell';
 			push @{ $output->{ 'missing_params' } }, $wanted_key;
 		} elsif ( not length $params_ref->{ $wanted_key } ) {
 			push @{ $output->{ 'blank_params' } }, $wanted_key;

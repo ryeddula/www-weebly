@@ -18,6 +18,7 @@ my $builder = Module::Build->new(
     requires => {
 		'URI::Escape'          => 0,
 		'HTTP::Tiny'           => 0,
+		'IO::Interactive'      => 0,
     },
     add_to_cleanup     => [ 'WWW-Weebly-*' ],
     create_makefile_pl => 'traditional',
