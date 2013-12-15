@@ -8,7 +8,6 @@ use Carp qw(croak);
 use Data::Dumper;
 use Digest::MD5 qw(md5_hex);
 use English qw(-no_match_vars);
-use IO::Interactive qw(interactive);
 use List::Util qw(first);
 
 use HTTP::Tiny;
@@ -26,15 +25,6 @@ Version 0.01
 =cut
 
 our $VERSION = '0.01';
-
-# Taken from IO::Interactive - creates a null file handle
-local (*DEV_NULL, *DEV_NULL2);
-my $dev_null;
-BEGIN {
-	pipe *DEV_NULL, *DEV_NULL2
-		or die "Internal error: can't create null filehandle";
-	$dev_null = \*DEV_NULL;
-}
 
 =head1 SYNOPSIS
 
@@ -79,8 +69,6 @@ B<Input> takes a hashref that contains:
 	Optional:
 	http_opts     => Hashref of options that are passed on to the HTTP::Tiny object that is used internally.
 	                 Example value: { 'agent' => 'WWW-Weebly', 'timeout' => 20, 'verify_SSL' => 'false', 'SSL_options' => {'SSL_verify_mode' => '0x00'} }
-	debug         => Prints additional information to STDERR if set to true.
-	debug_file    => If debug is true, and a value is specified at debug_file, then the debug output is sent to that file.
 
 =cut
 
@@ -90,16 +78,6 @@ sub new {
 
 	my $self = {};
 	bless $self, $class;
-
-	if ( _boolean ( $opts->{ debug } ) ) {
-		$self->{ debug } = $dev_null;
-		if ( my $debug_file = $opts->{debug_file} ) {
-			tie *{$self->{ debug }}, 'WWW::Weebly::TieFileWeebly', $debug_file
-				or croak ( 'unable to open the debug_file specified.' );
-		} else {
-			$self->{ debug } = interactive(*STDERR);
-		}
-	}
 
 	$self->{ weebly_secret } = $opts->{ weebly_secret }
 		or croak ( 'weebly_secret is a required parameter' );
@@ -124,7 +102,7 @@ sub new {
 		croak ( 'Must specify which URL to query in weebly_url' );
 	}
 
-	# Initiate the LWP objects for the queries
+	# Initiate the UA objects for the queries
 	my $http_opts = $opts->{ http_opts };
 	if (not (exists $http_opts->{agent} and defined $http_opts->{agent}) ) {
 		$http_opts->{agent} = 'WWW-Weebly'.$VERSION;
@@ -495,10 +473,10 @@ Parses the output from Weebly's API call, and returns it as a hash.
 
 sub _parse_output {
 
-	my @keys = split q{;}, shift;
+	my @keys = split /;/, shift;
 	my $output;
 	foreach my $key ( @keys ) {
-		my ( $k, $v ) = split q{=}, $key, 2;
+		my ( $k, $v ) = split /=/, $key, 2;
 		if ( $k eq 'status' ) {
 			$output->{ 'success' } = ( $v eq 'success' or $v eq 'true' ) ? 1 : 0;
 		} else {
@@ -764,29 +742,6 @@ sub _error {
 	if ( $croak ) {
 		croak $msg;
 	}
-}
-
-=head2 _boolean()
-
-Converts the value passed to 0 or 1 for condition checks:
-
-	true  => 1
-	false => 0
-
-It returns false if it is asked to check an object.
-
-=cut
-
-sub _boolean {
-
-	my $value = shift;
-	if ( not $value or ref $value ) { return 0; }
-	## no critic (RequireExtendedFormatting)
-	if ( $value =~ m/^true$/msi or $value eq '1' ) {
-		return 1;
-	}
-	## use critic
-	return 0;
 }
 
 =head1 AUTHOR
