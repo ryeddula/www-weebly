@@ -4,7 +4,7 @@
       "Rishwanth Yeddula <ryeddula@cpan.org>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4003, CPAN::Meta::Converter version 2.112150",
+   "generated_by" : "Module::Build version 0.4203",
    "license" : [
       "artistic_2"
    ],
@@ -16,36 +16,32 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "Test::More" : 0
+            "Test::More" : "0"
          }
       },
       "configure" : {
          "requires" : {
-            "Module::Build" : 0
+            "Module::Build" : "0"
          }
       },
       "runtime" : {
          "requires" : {
-            "HTTP::Tiny" : 0,
-            "URI::Escape" : 0
+            "HTTP::Tiny" : "0",
+            "URI::Escape" : "0"
          }
       }
    },
    "provides" : {
       "WWW::Weebly" : {
          "file" : "lib/WWW/Weebly.pm",
-         "version" : "0.01"
-      },
-      "WWW::Weebly::TieFileWeebly" : {
-         "file" : "lib/WWW/Weebly/TieFileWeebly.pm",
-         "version" : 0
+         "version" : "0.03"
       }
    },
    "release_status" : "stable",
    "resources" : {
       "license" : [
-         "http://opensource.org/licenses/artistic-license-2.0.php"
+         "http://www.perlfoundation.org/artistic_license_2_0"
       ]
    },
-   "version" : "0.01"
+   "version" : "0.03"
 }

@@ -7,7 +7,7 @@ build_requires:
 configure_requires:
   Module::Build: 0
 dynamic_config: 1
-generated_by: 'Module::Build version 0.4003, CPAN::Meta::Converter version 2.112150'
+generated_by: 'Module::Build version 0.4203, CPAN::Meta::Converter version 2.132140'
 license: artistic_2
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -16,13 +16,10 @@ name: WWW-Weebly
 provides:
   WWW::Weebly:
     file: lib/WWW/Weebly.pm
-    version: 0.01
-  WWW::Weebly::TieFileWeebly:
-    file: lib/WWW/Weebly/TieFileWeebly.pm
-    version: 0
+    version: 0.03
 requires:
   HTTP::Tiny: 0
   URI::Escape: 0
 resources:
-  license: http://opensource.org/licenses/artistic-license-2.0.php
-version: 0.01
+  license: http://www.perlfoundation.org/artistic_license_2_0
+version: 0.03

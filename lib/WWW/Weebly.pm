@@ -12,7 +12,6 @@ use List::Util qw(first);
 
 use HTTP::Tiny;
 use URI::Escape qw(uri_escape);
-use WWW::Weebly::TieFileWeebly;
 
 =head1 NAME
 
@@ -20,11 +19,11 @@ WWW::Weebly - Perl interface to interact with the Weebly API.
 
 =head1 VERSION
 
-Version 0.01
+Version 0.03
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.03';
 
 =head1 SYNOPSIS
 
@@ -54,7 +53,7 @@ This module provides you with an perl interface to interact with the Weebly API.
 
 =head2 new()
 
-Constructor.
+B<Croaks> on errors.
 
 B<Input> takes a hashref that contains:
 
@@ -109,15 +108,6 @@ sub new {
 	}
 	$self->{ _ua }  = HTTP::Tiny->new ( %{ $http_opts } );
 
-	if ( $self->{ debug } ) {
-		print { $self->{ debug } } '[d] Query URL: ' . $self->{ weebly_url } . "\n";
-		print { $self->{ debug } } '[d] Weebly Secret: ' . $self->{ weebly_secret } . "\n";
-		{
-			local $Data::Dumper::Deparse = 1;
-			print { $self->{ debug } } '[d] TID Sub: ' . Dumper $self->{ tid_sub };
-		}
-	}
-
 	return $self;
 }
 
@@ -125,9 +115,9 @@ sub new {
 
 Dispatches a newuser call to the URL specified in $self->{weebly_url}.
 
-B<Input>: None.
+B<Croaks> on errors.
 
-Croaks on errors.
+B<Input>: None.
 
 B<Returns> a hashref with the following keys otherwise:
 
@@ -147,7 +137,9 @@ Dispatches a login call to the URL specified in $self->{weebly_url}.
 
 Passes critical user account information to Weebly, such as the FTP info, account type (Basic/Premium), widget type, etc.
 
-Generates a one-time login url that is passed to the client to allow the client to log-in to the application.
+Generates a one-time use login url that allows the client to log-in to the Weebly editor.
+
+B<Croaks> on errors.
 
 B<Input>: hashref that contains the following information:
 
@@ -161,8 +153,6 @@ B<Input>: hashref that contains the following information:
 	publish_domain => Published site's FQDN (ie www.domain.com)
 	platform       => 'Windows' or 'Unix'
 	publish_upsell => Publish upsell URL (optional, placed in an 640px wide by 200px tall iframe on publish)
-
-Croaks on errors.
 
 B<Returns> a hashref with the following keys otherwise:
 
@@ -189,13 +179,13 @@ Dispatches a enableaccount call to the URL specified in $self->{weebly_url}.
 
 This call enables a user account that has been previously disabled.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
 	user_id     => the user_id of the account.
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following keys:
 
 	success => 1 or 0.
 	reason  => If the request fails, this will contain a text explanation of the failure as returned by Weebly.
@@ -217,13 +207,13 @@ This call disables login to a user account. This account will be accounted for i
 
 It is possible to restore login capabilities to this account using enable_account().
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
-	user_id     => the user_id of the account.
+	user_id => the user_id of the account.
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following keys:
 
 	success => 1 or 0.
 	reason  => If the request fails, this will contain a text explanation of the failure as returned by Weebly.
@@ -245,13 +235,13 @@ This call deletes a user account. This account will not be accounted for in user
 
 It is possible to restore this account using the Admin interface or via the undelete_account() call.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
-	user_id     => the user_id of the account.
+	user_id => the user_id of the account.
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following keys:
 
 	success => 1 or 0.
 	reason  => If the request fails, this will contain a text explanation of the failure as returned by Weebly.
@@ -271,13 +261,13 @@ Dispatches a undeleteaccount call to the URL specified in $self->{weebly_url}.
 
 This call restores a deleted user account.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
-	user_id     => the user_id of the account.
+	user_id => the user_id of the account.
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following keys:
 
 	success => 1 or 0.
 	reason  => If the request fails, this will contain a text explanation of the failure as returned by Weebly.
@@ -297,16 +287,17 @@ Dispatches a upgradeaccount call to the URL specified in $self->{weebly_url}.
 
 This call upgrades a user account with a given service.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
 	user_id     => the user_id of the account.
-	service_id  => the server_id to be added to the account. Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
+	service_id  => the server_id to be added to the account.
+	               Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
 	term        => duration of the service in months.
 	price       => price paid for the service.
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following keys:
 
 	success => 1 or 0.
 	reason  => If the request fails, this will contain a text explanation of the failure as returned by Weebly.
@@ -326,14 +317,15 @@ Dispatches a downgradeaccount call to the URL specified in $self->{weebly_url}.
 
 This call can be used to check if the specified user_id has Pro or Ecommerce features enabled.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 
 	user_id     => the user_id of the account.
-	service_id  => the server_id to be removed from the account. Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
+	service_id  => the server_id to be removed from the account.
+	               Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following key:
 
 	success => 1 or 0.
 
@@ -352,13 +344,14 @@ Dispatches a hasservice call to the URL specified in $self->{weebly_url}.
 
 This call can be used to check if the specified user_id has Pro or Ecommerce features enabled.
 
+B<Croaks> on errors.
+
 B<Input>: hashref that contains the following information:
 	user_id     => the user_id of the account.
-	service_id  => the server_id to check. Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
+	service_id  => the server_id to check.
+	               Current service_ids that Weebly responds are: 'Weebly.proAccount', 'Weebly.eCommerce'
 
-Croaks on errors.
-
-B<Returns> a hashref with the following keys otherwise:
+B<Returns> a hashref with the following key:
 
 	success => 1 or 0.
 
@@ -383,12 +376,6 @@ to be used as the auth token in the API calls.
 sub get_auth_token {
 
 	my ( $self, @params ) = @_;
-	if ( $self->{ debug } ) {
-		print { $self->{ debug } } "[d] Generating Auth Token with the following params:\n";
-		print { $self->{ debug } } "\tTID   : $params[0]\n" if $params[ 0 ];
-		print { $self->{ debug } } "\tAction: $params[1]\n" if $params[ 1 ];
-		print { $self->{ debug } } "\tUserid: $params[2]\n" if $params[ 2 ];
-	}
 	@params = grep { defined } @params;
 	return md5_hex ( $self->get_weebly_secret (), @params );
 }
@@ -427,9 +414,14 @@ The following are not meant to be used directly, but are available if 'finer' co
 
 Wraps the call to _make_request and handles error checks.
 
-B<INPUT> Takes the 'action' and sanitized paramaters hashref as input.
+B<INPUT>
 
-B<Output> Returns undef on failure (sets $self->{error} with the proper error). Returns a hashref with the parsed data from the API server if successful.
+	Takes the 'action' and sanitized paramaters hashref as input.
+
+B<Output>
+
+	Returns undef on failure (sets $self->{error} with the proper error).
+	Returns a hashref with the parsed data from the API server if successful.
 
 =cut
 
@@ -442,7 +434,6 @@ sub _do_request {
 	my $userid;
 	my $uri = $self->_get_url ( $action )
 		or return $self->_error ( 'Failed to fetch URL to query. Error: ' . $self->_get_error, 1 );
-	print { $self->{ debug } } '[d] Base URI with action is: ' . $uri . "\n" if $self->{ debug };
 
 	if ( $params and ref $params eq 'HASH' ) {
 		$userid = $params->{ 'user_id' };
@@ -450,7 +441,6 @@ sub _do_request {
 	}
 
 	$uri = $self->_add_auth ( $uri, $action, $userid );
-	print { $self->{ debug } } '[d] Full URL being queried: ' . $uri . "\n" if $self->{ debug };
 
 	my ( $output, $error ) = $self->_make_request ( $uri );
 	if ( $error ) {
@@ -460,7 +450,7 @@ sub _do_request {
 	return $self->_error ( 'No output returned from the Weebly API. Failed fetching results from the following URI: '
 						   . $uri, 1 )
 		if not $output;
-	print { $self->{ debug } } '[d] Raw output: ' . $output . "\n" if $self->{ debug };
+
 	$output = _parse_output ( $output );
 	return $output;
 }
@@ -491,6 +481,7 @@ sub _parse_output {
 Depending on the action passed, it will return part of the URL that you can use along with the _stringify_params method to generate the full GET url.
 
 B<Input>: action param
+
 B<Returns>: get_weebly_url().'/weebly/api.php?action='.$action
 
 =cut
@@ -524,8 +515,9 @@ B<Input>: None.
 
 B<Returns> the tid value generated by the sub referenced in $self->{tid_sub}.
 
-If a 'tid_seed' value was specified when the object was created, then the value returned is the
-md5_hex hash of the tid_seed value concatenated with the time().
+If a 'tid_seed' value was specified when the object was created,
+then the value returned is the md5_hex hash of the tid_seed value
+concatenated with time().
 
 =cut
 
@@ -540,6 +532,7 @@ B<Input> The full uri to perform the HTTP request on.
 B<Output> Returns an array containing the http response, and error.
 
 If the HTTP request was successful, then the error is blank.
+
 If the HTTP request failed, then the response is blank and the error is the status line from the HTTP response.
 
 =cut
@@ -666,13 +659,19 @@ sub _stringify_params {
 
 =head2 _check_required_keys()
 
-B<Input> First arg: Hashref that contains the data to be checked.
-         Second arg: Hashref that holds the keys to check for.
+B<Input>
 
-B<Output> A hash containing the 'missing_params' and 'blank_params', if any are found to be missing.
-          If a required key is missing, it will be present in the missing_params array.
-          If a required key has a blank value, it will be present in the blank_params array.
-          Returns undef, if no issues are found.
+	First arg: Hashref that contains the data to be checked.
+	Second arg: Hashref that holds the keys to check for.
+
+B<Output>
+
+A hash containing the 'missing_params' and 'blank_params', if any are found to be missing.
+
+	If a required key is missing, it will be present in the missing_params array.
+	If a required key has a blank value, it will be present in the blank_params array.
+
+Returns undef, if no issues are found.
 
 =cut
 
@@ -697,10 +696,14 @@ sub _check_required_keys {
 
 Deletes keys from the provided params hashref, if they are not listed in the hash for wanted keys.
 
-B<Input> First  arg: Hashref that contains the data to be checked. 
-	     Second arg: Hashref that holds the keys to check for.
+B<Input>
 
-B<Output> None/undef.
+	First arg: Hashref that contains the data to be checked. 
+	Second arg: Hashref that holds the keys to check for.
+
+B<Output>
+
+	undef
 
 =cut
 
